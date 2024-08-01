@@ -16,6 +16,8 @@ from HMMSTR_utils.HMMSTR_utils import *
 from process_read.process_read import Process_Read
 from GMM_stats.GMM_stats import GMMStats
 from KDE_stats.KDE_stats import KDE_cluster
+#imports for motif plotting
+from motif_comp.motif_comp_code import *
 import pysam
 import mappy
 import queue  # imported for using queue.Empty exception
@@ -672,6 +674,10 @@ def main():
     parser.add_argument("--hmm_pre", type=str,help="Prefix for files produced by build function, use if running the same targets across multiple input files. Only compatible with --save_intermediates option from previous run")
 
 
+    # New arguments for motif composition analysis
+    parser.add_argument("--motif_comp", action='store_true', help="Flag to run motif composition analysis")
+    parser.add_argument("--motif_targets", type=str, nargs='+', help="List of targets for motif composition")
+
     #check input to see if file or command line was used
     if len(sys.argv) != 2:
         args = parser.parse_args()
@@ -888,5 +894,39 @@ def main():
             os.remove(args.out+"_prefix.fa")
         if os.path.exists(args.out+"_suffix.fa"):
             os.remove(args.out+"_suffix.fa")
+
+    # Code block to run motif composition pipeline
+
+    if args.motif_comp:
+        motif_info = motif_comp.motif_info.tsv
+        read_assignments = os.path.join(args.out, f"{args.out}_read_assignments.tsv")
+        sample_file = args.inFile
+        output_folder = os.path.join(args.out, "motif_comp")
+        os.makedirs(output_folder, exist_ok=True)
+        motif_targets = args.motif_targets if args.motif_targets else "all"
+
+        # Generate consensus sequences
+        generate_consensus(read_assignments, sample_file, output_folder, targets=motif_targets)
+
+        # Define input and output for motifscope
+        input_fasta = os.path.join(output_folder, "consensus_sequence_file.fa")
+        motif_data = args.targets  
+
+        # Run motifscope processing
+        os.chdir(output_folder)
+        process_and_run_motifscope(input_fasta, output_folder, motif_data, targets=motif_targets)
+
+        # Generate plots
+        for file in os.listdir(output_folder):
+            if "compressed_representation" in file:
+                target = [file.split(".fa")[0]]
+                input_file = os.path.join(output_folder, file)
+                graphing(input_file, targets=target)
+                os.remove(file)  # Clean intermediates for motif comp
+            elif "motif_in_hex" in file:
+                os.remove(file)
+            elif "motif_to_hex" in file:
+                os.remove(file)
+
 if __name__ == "__main__":
   main()

@@ -7,3 +7,10 @@ scipy
 seaborn
 importlib-resources
 mappy
+pysam
+biopython
+matplotlib
+multiprocess
+umap-learn
+levenshtein
+pyabpoa

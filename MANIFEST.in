@@ -11,3 +11,4 @@ recursive-include src/c_files *.h
 
 recursive-include tests *.py
 recursive-include data *.pkl
+recursive-include data motif_info.tsv

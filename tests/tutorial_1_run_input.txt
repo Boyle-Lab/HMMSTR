@@ -1,0 +1,16 @@
+targets_tsv
+AAAAG_input.txt
+./tutorial_1
+AAAAG_11012021_3000_sample.fasta
+--output_plots
+--output_labelled_seqs
+--max_peaks 3
+--cpus 44
+--flanking_size 100
+--mode map-ont
+--mapq_cutoff 30
+--peakcalling_method auto
+--kernel gaussian
+--call_width 0.95
+--resample_size 100
+--filter_quantile 0.25

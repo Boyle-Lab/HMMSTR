@@ -27,6 +27,11 @@ Our preprint is now available on medRxiv [here](https://www.medrxiv.org/content/
   sudo apt install libglib2.0-dev
   ```
 
+* clustalw2 (Ubuntu install command below)
+  ```
+  sudo apt install clustalw2
+  ```
+
 ## Installation
 HMMSTR is currently available on Pypi and Anaconda
 ```
@@ -132,8 +137,18 @@ Optionally, the user may also input all options as a text file which each input 
 </details>
 <details>
 <summary> Advanced Options </summary>
-  
+
 ### Advanced Options
+#### Motif Composition Plotting Options
+Optional plotting of motif compositon for targets on the repeat expansion panel (64 disease associated tandem repeats). Motif breakdown of the consensus sequence for each target is performed by motifscope, a tool for motif detection and analysis (https://github.com/holstegelab/MotifScope/).
+
+Currently not compatible with bam input.
+ 
+|  Argument &nbsp; &nbsp; &nbsp;  &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;| Description |
+|---|---|
+|--motif_comp| Output consensus sequences for each target by haplotype and creates a visual plot of sequence breakdown by motif (default: not run)|
+|--motif_targets| Targets of interest for motif composition plotting - inserted as a comma sepearated list of targets (ex. SCA27B,HD,FAME7) (default: all targets)|
+
 #### Custom Model Parameter Options
 Optional tsv inputs to set custom model parameters.
 |  Argument &nbsp; &nbsp; &nbsp; | Description |

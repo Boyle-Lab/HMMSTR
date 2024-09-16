@@ -3,6 +3,8 @@ HMMSTR
 HMMSTR_utils
 KDE_stats
 c_files
+motif_comp
 process_read
 process_vit_res
 profile_HMM
+pylibsais

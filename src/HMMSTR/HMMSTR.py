@@ -755,11 +755,16 @@ def main():
     if args.cluster_only == False:
         if args.hmm_pre is None:
             pool_start = perf_counter()
-            #build all models
-            targets.apply(build_all,axis=1,args=(args.out, background, alphabet,A_probs, E_probs, custom_RM, args.flanking_size))
+            #build all models in parallel
+            build_args = [
+                (row, args.out, background, alphabet, A_probs, E_probs, custom_RM, args.flanking_size)
+                for _, row in targets.iterrows()
+            ]
+            with mp.Pool(processes=args.cpus) as pool:
+                pool.starmap(build_all, build_args)
             pool_end = perf_counter()
             print("All models built! finished .... time was: ", str(pool_end-pool_start))
-            build_pre = args.out 
+            build_pre = args.out
         else:
             print("Using previously written input files with prefix: " + args.hmm_pre)
             build_pre = args.hmm_pre

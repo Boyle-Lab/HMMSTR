@@ -3,14 +3,13 @@
 import argparse
 import os, glob
 import gzip
-#import numpy as np
+import numpy as np #used in main will crash if stranded report is used
 import pandas as pd
-from time import perf_counter, sleep
+from time import perf_counter
 import multiprocessing as mp
-from multiprocessing import Pool, Queue, Process, Manager, Semaphore
+from multiprocessing import Pool
 import pickle as pkl
 import sys
-#custom imports
 from profile_HMM.profile_HMM import ProfileHMM
 from HMMSTR_utils.HMMSTR_utils import *
 from process_read.process_read import Process_Read
@@ -21,12 +20,13 @@ import mappy
 import queue  # imported for using queue.Empty exception
 
 
-class LoadFromFile (argparse.Action):
-    #for reading from input file instead of command line
-    def __call__ (self, parser, namespace, values, option_string = None):
-        with values as f:
-            # parse arguments in the file and store them in the target namespace
-            parser.parse_args(f.read().split(), namespace)
+# not acuatly used, read_my_file does the same thing
+# class LoadFromFile (argparse.Action):
+#     #for reading from input file instead of command line
+#     def __call__ (self, parser, namespace, values, option_string = None):
+#         with values as f:
+#             # parse arguments in the file and store them in the target namespace
+#             parser.parse_args(f.read().split(), namespace)
 
 def read_my_file(argv):
     '''
@@ -38,6 +38,7 @@ def read_my_file(argv):
             for b in a.rstrip().split(" "):
                 new_argv.append(b)
     return new_argv
+
 def write_input_command(args):
     '''
     Function to write out args to file compatible with read_my_file for future runs
@@ -68,6 +69,7 @@ def write_input_command(args):
                 continue
             outfile.write("--"+key + " "+ str(val)+"\n")
     return
+
 def convert_to_fasta(tsv,out):
     '''
     Function to write "read" entry for a given target for both prefix and suffix
@@ -91,6 +93,7 @@ def convert_to_fasta(tsv,out):
         curr_out.write(row.suffix + "\n")
         curr_out.close()
     return
+
 def build_all(curr_target, out, background,alphabet,transitions,mismatch_probs, repeat_probs,flanking_size):
     '''
     Function to initialize a ProfileHMM object for a row in input targets tsv
@@ -120,7 +123,7 @@ def build_all(curr_target, out, background,alphabet,transitions,mismatch_probs, 
     return
 
     
-def fetch_reads(bam_file, regions, mapq_cutoff, *args):
+def fetch_reads(bam_file, regions, mapq_cutoff): 
     '''
     Function to fetch reads from a BAM file given a list of regions
     '''
@@ -135,17 +138,8 @@ def fetch_reads(bam_file, regions, mapq_cutoff, *args):
                         region_name = region[3]
                     else:
                         region_name = f'{region[0]}:{region[1]}-{region[2]}'
-                    yield (read_id, seq, region_name) + args
+                    yield (read_id, seq, region_name) 
 
-def worker(args):
-    # print('Worker function called')  # Add this line
-    try:
-        read_id, seq, region, hmm_file, rev_hmm_file, hidden_states, hidden_states_rev, out, targets, build_pre, mode, mapq_cutoff, k, w, use_full_read, flanking_size, output_labelled_seqs, coords_file = args
-        # print('Calling process_read')  # Add this line
-        process_read(read_id, seq, hmm_file, rev_hmm_file, hidden_states, hidden_states_rev, out, targets, build_pre, mode, mapq_cutoff, k, w, use_full_read, flanking_size, output_labelled_seqs, region, coords_file)
-        return True
-    except Exception as e:
-        print(f'Exception in worker function: {e}')  # Add this line
 def process_read(header,seq,hmm_file,rev_hmm_file,hidden_states,hidden_states_rev,out,targets, build_pre, mode, cutoff, k, w, use_full_seq, flanking_size,output_labelled_seqs,region=None, coord_file=None):
     '''
     Wrapper function to call all Process_Read methods. This will initialize all operations
@@ -422,7 +416,7 @@ def call_peaks(row, out, out_count_name, plot_hists, max_peaks, filter_outliers=
     curr_row["peak_calling_method"] = decision
     return curr_row #return genotype
     
-def call_peaks_stranded(row, out, out_count_name, plot_hists, max_peaks, filter_outliers=False, filter_quantile=0.25,bootstrap=False, CI_width=0.95, resample_size=100,allele_specific_plots=False,allele_specif_CIs=False, bandwidth='scott',kernel="gaussian",flanking_like_filter=False, strand=None):
+def call_peaks_stranded(row, out, out_count_name, plot_hists, max_peaks, filter_outliers=False, filter_quantile=0.25,bootstrap=False, CI_width=0.95, resample_size=100,allele_specific_plots=False,allele_specif_CIs=False, bandwidth='scott',kernel="gaussian",flanking_like_filter=False, strand=None): 
     '''
     This method is the wrapper function for calling both KDE and GMM classes based on the decision per target, it also insures the outputs are uniform across all methods. This version runs only on the given strand.
 
@@ -570,7 +564,7 @@ def call_peaks_stranded(row, out, out_count_name, plot_hists, max_peaks, filter_
         gmm_stats = GMMStats(target_row=row) #contains all target attributes as well as E and A dictionaries
         final_data = gmm_stats.get_stats(out_count_file, out,plot_hists, filter_outliers, filter_quantile=filter_quantile,flanking_like_filter=flanking_like_filter, curr_strand=strand)
     
-        final_data.to_csv(out +"_"+ gmm_stats.name +"_"+strand+"_final_out.tsv", index = False, sep="\t")
+        #final_data.to_csv(out +"_"+ gmm_stats.name +"_"+strand+"_final_out.tsv", index = False, sep="\t")
         
         #peak calling
         final_data2 = final_data[final_data.outlier == False][final_data.flanking_outlier == False][final_data.counts != 0].copy()
@@ -755,11 +749,19 @@ def main():
     if args.cluster_only == False:
         if args.hmm_pre is None:
             pool_start = perf_counter()
-            #build all models
-            targets.apply(build_all,axis=1,args=(args.out, background, alphabet,A_probs, E_probs, custom_RM, args.flanking_size))
+            #build all models in parallel
+            build_args = []
+            for _, row in targets.iterrows():
+                arg_tuple = (row, args.out, background, alphabet, A_probs, E_probs, custom_RM, args.flanking_size
+                             )
+                build_args.append(arg_tuple)
+
+            with mp.Pool(processes=args.cpus) as pool:
+                pool.starmap(build_all, build_args)
+                 
             pool_end = perf_counter()
             print("All models built! finished .... time was: ", str(pool_end-pool_start))
-            build_pre = args.out 
+            build_pre = args.out
         else:
             print("Using previously written input files with prefix: " + args.hmm_pre)
             build_pre = args.hmm_pre
@@ -785,8 +787,11 @@ def main():
                 if num_columns == 4:
                     regions = [(line.split()[0], int(line.split()[1]), int(line.split()[2])) for line in f] #FIXME this current implementation uses the coordinates from the bed file to get regions and ignores names (if provided), this will break in process read since we write our outputs in terms of names, thus currently only compatible with no names given
                 elif num_columns == 5:
-                    regions = [(line.split()[0], int(line.split()[1]), int(line.split()[2]),line.split()[4]) for line in f] #names are given and these will correspond to the outputs and model names
-            pool.imap(worker, fetch_reads(args.inFile, regions, args.mapq_cutoff, hmm_file, rev_hmm_file, hidden_states, hidden_states_rev, args.out, targets, build_pre, args.mode, args.mapq_cutoff, args.k, args.w, args.use_full_read, args.flanking_size, args.output_labelled_seqs, args.coords_file), chunksize=10) #10 for now, ran faster than args.cpus
+                    regions = [(line.split()[0], int(line.split()[1]), int(line.split()[2]),line.split()[4]) for line in f] #names are given and these will correspond to the outputs and model name 
+
+            [pool.apply_async(process_read, args=(read_id,seq, hmm_file, rev_hmm_file, hidden_states, hidden_states_rev, args.out, targets, build_pre, args.mode, args.mapq_cutoff, args.k,
+            args.w, args.use_full_read, args.flanking_size, args.output_labelled_seqs, region_name, args.coords_file )) for read_id, seq, region_name in fetch_reads(args.inFile, regions, args.mapq_cutoff)]
+            
         elif args.subcommand == 'targets_tsv' and args.inFile.endswith('bam'): #not currently allowed
             print("Bam file input not allowed with targets_tsv input, please run with coordinates input or fast(a/q) infile. exiting...")
             return
@@ -835,7 +840,15 @@ def main():
             pd.DataFrame(['name','read_id','strand', 'align_score','neg_log_likelihood', 'subset_likelihood', 'repeat_likelihood','repeat_start', 'repeat_end', 'align_start', 'align_end', 'counts','freq','cluster_assignments',"outlier","peak_calling_method"]).T.to_csv(args.out + "_read_assignments.tsv", sep="\t", index=False,header=None)
 
         #call genotypes with assigned or given peakcalling method
-        geno_df = targets.apply(call_peaks, args=(args.out, out_count_name, args.output_plots,args.max_peaks,args.discard_outliers,args.filter_quantile,args.bootstrap, args.call_width, args.resample_size,args.allele_specific_plots,args.allele_specific_CIs, args.bandwidth,args.kernel,args.flanking_like_filter), axis=1)
+    
+        call_args = []
+        for _, row in targets.iterrows():
+            call_args.append((row, args.out, out_count_name, args.output_plots,args.max_peaks,args.discard_outliers,args.filter_quantile,args.bootstrap, args.call_width, args.resample_size,args.allele_specific_plots,args.allele_specific_CIs, args.bandwidth,args.kernel,args.flanking_like_filter))
+
+        with mp.Pool(processes=args.cpus) as pool:
+             result = pool.starmap(call_peaks, call_args)
+        geno_df = pd.DataFrame(result)
+        
         #read resulting read_assignments for sorting
         read_assignments = pd.read_csv(args.out + "_read_assignments.tsv", sep="\t")
         #check if valid genotype output
@@ -860,9 +873,22 @@ def main():
             pd.DataFrame(['name','read_id','strand', 'align_score','neg_log_likelihood', 'subset_likelihood', 'repeat_likelihood','repeat_start', 'repeat_end', 'align_start', 'align_end', 'counts','freq','cluster_assignments',"outlier","peak_calling_method"]).T.to_csv(args.out + "_reverse_read_assignments.tsv", sep="\t", index=False,header=None)
 
         #genotype each strand independently
-        geno_forward_df = targets.apply(call_peaks_stranded, args=(args.out, out_count_name, args.output_plots,args.max_peaks,args.discard_outliers,args.filter_quantile,args.bootstrap, args.call_width, args.resample_size,args.allele_specific_plots,args.allele_specific_CIs, args.bandwidth,args.kernel,args.flanking_like_filter,"forward"), axis=1)
-        geno_reverse_df = targets.apply(call_peaks_stranded, args=(args.out, out_count_name, args.output_plots,args.max_peaks,args.discard_outliers,args.filter_quantile,args.bootstrap, args.call_width, args.resample_size,args.allele_specific_plots,args.allele_specific_CIs, args.bandwidth,args.kernel,args.flanking_like_filter, "reverse"), axis=1)
-        
+        call_args_fwd = []
+
+        for _, row in targets.iterrows():
+            call_args_fwd.append((row,args.out, out_count_name, args.output_plots,args.max_peaks,args.discard_outliers,args.filter_quantile,args.bootstrap, args.call_width, args.resample_size,args.allele_specific_plots,args.allele_specific_CIs, args.bandwidth,args.kernel,args.flanking_like_filter,"forward"))
+
+        call_args_rev = []
+
+        for _, row in targets.iterrows():
+            call_args_rev.append((row, args.out, out_count_name, args.output_plots,args.max_peaks,args.discard_outliers,args.filter_quantile,args.bootstrap, args.call_width, args.resample_size,args.allele_specific_plots,args.allele_specific_CIs, args.bandwidth,args.kernel,args.flanking_like_filter, "reverse"))
+
+        with mp.Pool(processes=args.cpus) as pool:
+            result_fwd = pool.starmap(call_peaks_stranded, call_args_fwd)
+            result_rev = pool.starmap(call_peaks_stranded, call_args_rev)
+        geno_forward_df = pd.DataFrame(result_fwd)
+        geno_reverse_df = pd.DataFrame(result_rev)
+
         #concat stranded results
         geno_df = pd.concat([geno_forward_df,geno_reverse_df]).sort_values(by="name")
         if isinstance(geno_df, pd.DataFrame):
@@ -886,9 +912,10 @@ def main():
         for file_subset in glob.glob(args.out+"*labeled_seqs.txt"):
             if os.path.exists(file_subset):
                 os.remove(file_subset)
-        #FIXME counts file is required for cluster only
-        for file_subset in glob.glob(args.out+"*counts.txt"):
-            os.remove(file_subset)
+        #FIXME counts file is required for cluster only -- done
+        if not args.cluster_only:
+            for file_subset in glob.glob(args.out+"*counts.txt"):
+                os.remove(file_subset)
         if os.path.exists(args.out+"_prefix.fa"):
             os.remove(args.out+"_prefix.fa")
         if os.path.exists(args.out+"_suffix.fa"):
